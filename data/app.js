@@ -2981,17 +2981,19 @@ const Settings = () => {
     if (/^#settings(\/|$)/.test(location.hash)) history.replaceState(null, '', '#settings/' + s);
   };
   const [canMode, setCanMode] = useState(false);
+  const [canOnly, setCanOnly] = useState(false);
   const [canNodeId, setCanNodeId] = useState(1);
   const [canSpeed, setCanSpeed] = useState(2);
   const [canRxPin, setCanRxPin] = useState(4);
   const [canTxPin, setCanTxPin] = useState(5);
-  // Optional transceiver enable pins (strings so blank = unused); board arch
-  // gates which board presets are offered
+  // Optional transceiver enable pins (strings so blank = unused); board ID or
+  // architecture gates which board presets are offered.
   const [canPwrPin, setCanPwrPin] = useState('');
   const [canPwrInv, setCanPwrInv] = useState(false);
   const [canEnPin, setCanEnPin] = useState('');
   const [canEnInv, setCanEnInv] = useState(false);
   const [boardArch, setBoardArch] = useState(''); // '' = unknown → offer no presets (don't guess the wrong chip's pins)
+  const [boardId, setBoardId] = useState('');
   // Interface settings as persisted on the device — drives the unsaved-change
   // hint and gates scanning (a scan runs on the SAVED config, not the form)
   const [savedCan, setSavedCan] = useState({ mode: false, speed: 2, rx: 4, tx: 5, pwr: '', pwrInv: false, en: '', enInv: false, uartRx: 1, uartTx: 3 });
@@ -3008,6 +3010,7 @@ const Settings = () => {
           setApFb(data.ap_fallback === true);
           if (typeof data.dev_name === 'string') setDevName(data.dev_name);
           setCanMode(data.can_mode === true);
+          setCanOnly(data.can_only === true);
           if (data.can_node_id) setCanNodeId(data.can_node_id);
           if (data.can_speed !== undefined) setCanSpeed(data.can_speed);
           if (data.can_rx_pin) setCanRxPin(data.can_rx_pin);
@@ -3017,6 +3020,7 @@ const Settings = () => {
           setCanPwrPin(pwr); setCanPwrInv(data.can_pwr_inv === true);
           setCanEnPin(en); setCanEnInv(data.can_en_inv === true);
           if (data.arch) setBoardArch(data.arch);
+          if (data.board) setBoardId(data.board);
           setSavedCan({
             mode: data.can_mode === true,
             speed: data.can_speed !== undefined ? data.can_speed : 2,
@@ -3070,8 +3074,8 @@ const Settings = () => {
       canPwrPin !== savedCan.pwr || canPwrInv !== savedCan.pwrInv || canEnPin !== savedCan.en || canEnInv !== savedCan.enInv)) ||
     uartRxPin !== savedCan.uartRx || uartTxPin !== savedCan.uartTx;
   const scanReady = savedCan.mode && !canDirty;
-  // Board presets fill the CAN pins in one go; only offer those built for this
-  // chip (ESP32 vs ESP32-S3 have different valid GPIOs)
+  // Board presets fill the CAN pins in one go. CAN-only builds require an
+  // exact board match; generic builds may offer architecture-level presets.
   const applyBoardPreset = (id) => {
     const bp = CAN_BOARD_PRESETS.find(b => b.id === id);
     if (!bp) return;
@@ -3104,8 +3108,12 @@ const Settings = () => {
           <p style="color:var(--text2);font-size:.8rem;margin:0 0 .5rem">How this module talks to the inverter.</p>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:.5rem">
             <div class="seg" id="iface-seg">
-              <button class=${!canMode ? 'sel' : ''} onclick=${() => setCanMode(false)}>UART (Serial)</button>
-              <button class=${canMode ? 'sel' : ''} onclick=${() => setCanMode(true)}>CAN Bus</button>
+              ${canOnly ? html`
+                <button class="sel" disabled>CAN Bus (fixed)</button>
+              ` : html`
+                <button class=${!canMode ? 'sel' : ''} onclick=${() => setCanMode(false)}>UART (Serial)</button>
+                <button class=${canMode ? 'sel' : ''} onclick=${() => setCanMode(true)}>CAN Bus</button>
+              `}
             </div>
             <button id="iface-save" onclick=${async () => {
               setSaving(true);
@@ -3166,7 +3174,8 @@ const Settings = () => {
             <p class="settings-subhead">CAN Bus</p>
             ${boardArch && html`<p style="font-size:.72rem;color:var(--text3);margin:0 0 .35rem">This build: <b>${boardArch}</b></p>`}
             ${(() => {
-              const boards = CAN_BOARD_PRESETS.filter(b => b.arch === boardArch);
+              const boards = CAN_BOARD_PRESETS.filter(b =>
+                b.board ? b.board === boardId : (!canOnly && b.arch === boardArch));
               return boards.length ? html`
                 <label style="font-size:.75rem;display:block;margin-bottom:.35rem">Board preset
                   <select id="can-board-preset" class="styled" style="font-size:.7rem;margin-left:6px"

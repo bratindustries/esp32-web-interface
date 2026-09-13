@@ -49,19 +49,20 @@ Works with the OpenInverter family of firmware:
 ## Getting started
 
 ### 1. Get an image
-Pre-built **flash-at-`0x0` combined images** for both supported boards:
+Pre-built **flash-at-`0x0` combined images** for supported boards:
 
 | Source | What you get |
 |---|---|
-| [Latest release](https://github.com/wjcloudy/esp32-web-interface/releases/latest) | Version-stamped raw `.bin` files: full-flash `*-0x000.bin` and OTA `*-ota.bin`, per board (e.g. `esp32_wemos_v4.1-0x000.bin`) |
+| [Latest release](https://github.com/wjcloudy/esp32-web-interface/releases/latest) | Version-stamped raw `.bin` files: full-flash `*-0x000.bin` and OTA `*-ota.bin`, per board (e.g. `esp32_v4.1-0x000.bin`) |
 | [CI builds](https://github.com/wjcloudy/esp32-web-interface/actions/workflows/build.yml?query=branch%3Amain) | Every push, as run artifacts (zipped) |
 
 ### 2. Flash it
 Flash the image at offset `0x0` with [ESP Web Tools](https://espressif.github.io/esptool-js/) or `esptool.py`:
 
 ```sh
-esptool.py --chip esp32   write_flash 0x0 esp32_wemos_v4.1-0x000.bin   # classic ESP32 / Wemos
-esptool.py --chip esp32s3 write_flash 0x0 esp32_t2can_v4.1-0x000.bin   # LILYGO T-2Can
+esptool.py --chip esp32   write_flash 0x0 esp32_v4.1-0x000.bin          # classic ESP32 / Wemos
+esptool.py --chip esp32s3 write_flash 0x0 esp32s3_v4.1-0x000.bin        # LILYGO T-2Can
+esptool.py --chip esp32s3 write_flash 0x0 esp32_tembed_v4.1-0x000.bin  # LILYGO T-Embed
 ```
 
 ### 3. Connect
@@ -79,12 +80,24 @@ In **Settings → Interface**: choose **UART** (default) or **CAN Bus** → Save
 |---|---|
 | ESP32-WROOM-32E (and most dev boards) | UART to the inverter on pin 16 (RX ← inverter TX) and pin 17 (TX → inverter RX) |
 | LILYGO T-2Can (ESP32-S3) | Built-in CAN transceiver — default CAN pins RX 6 / TX 7 (`esp32_t2can` build target) |
+| LILYGO T-Embed (ESP32-S3) | CAN-only target for an external transceiver (default RX 6 / TX 7, configurable in Settings), built-in 320×170 ST7789V display, and rotary-encoder dashboard (`esp32_tembed` build target). |
 
 Optional peripherals (classic ESP32):
 - **SD card** in SDIO mode for data logging — CLK pin 14, CMD pin 15, D0 pin 2, D1 pin 4, D2 pin 12, D3 pin 13
 - **RTC** (PCF8523 as standard, anything RTClib supports with a sketch change) — SCL pin 22, SDA pin 21
 
 CAN speed (125k/250k/500k) and pins are configurable in Settings on any board.
+
+### T-Embed display controls
+
+The on-device dashboard uses the same files as the web interface; there is no separate display configuration. Dashboard metric cards come from `uiprefs.json` (`dashMetrics`, defaulting to `udc` and `tmphs`), while gauge order, type, labels, ranges, colours, interactive controls and operating-mode conditions come from `gauges.json`.
+
+- Rotate the encoder to move from the dashboard through the gauges on the page matching the current condition (for example, `opmode`). If no condition matches, the first unconditioned page is used.
+- Press on a slider or toggle to select it, rotate to adjust the pending value, then press again to write it over CAN.
+- Press an action gauge and press again to confirm it. Parameter-set, raw-CAN and parameter-preset actions are supported.
+- Hold the centre button for 0.8 seconds to cancel editing and return to the dashboard.
+
+Gauge and dashboard changes saved in the web interface are picked up by the display automatically. Only the original LILYGO T-Embed is targeted; the CC1101 model has different hardware and is not selected by this environment.
 
 ---
 
@@ -94,7 +107,7 @@ CAN speed (125k/250k/500k) and pins are configurable in Settings on any board.
 Once a board is running you can update it over WiFi from the **Update** tab — no cables, no toolchain. Updates use a combined **`*-ota.bin`** image that flashes the ESP32 firmware **and** the web interface together, so the two can never drift out of sync. The bootloader and partition table are left untouched, so a bad image stays recoverable over USB. The device reboots and the page reloads automatically when the flash completes.
 
 **From the web interface — Update → Web Interface:**
-- **Get releases** → choose a release. The image matching your board (`esp32_wemos` or `esp32_t2can`, marked *(this board)*) is pre-selected. The repository field defaults to the repo this build came from, but you can point it at any fork. Then **Download & install**.
+- **Get releases** → choose a release. The image matching your board (`esp32`, `esp32s3`, or `esp32_tembed`, marked *(this board)*) is pre-selected. The repository field defaults to the repo this build came from, but you can point it at any fork. Then **Download & install**.
 - **Install OTA image from file** — upload an `*-ota.bin` you already have (e.g. a release asset).
 - **Upload single file** — replace one file in the filesystem without a full update.
 
@@ -141,9 +154,9 @@ Built with the Arduino framework. Versioning comes from git tags (`git describe`
 
 - **PlatformIO (recommended)** — [setup](doc/PLATFORMIO_setup.md) · [day-to-day usage](doc/PLATFORMIO_usage.md) · [flashing walkthrough (VS Code)](doc/PLATFORMIO_flashing_esp32.md) · [building a combined binary](doc/PLATFORMIO_usage.md#building-a-combined-binary-for-web-flasher)
 - **Arduino IDE** — [setup](doc/ARDUINO_IDE_setup.md) · [usage](doc/ARDUINO_IDE_usage.md)
-- **CI** — every push builds both targets and publishes combined images ([workflow](.github/workflows/build.yml)); pushing a `v*` tag creates a release with version-stamped binaries
+- **CI** — every push builds all targets and publishes combined images ([workflow](.github/workflows/build.yml)); pushing a `v*` tag creates a release with version-stamped binaries
 
-Build targets: `esp32_wemos` / `esp32_wemos_debug` (classic ESP32 / Wemos), `esp32_t2can` / `esp32_t2can_debug` (LILYGO T-2Can, ESP32-S3).
+Build targets: `esp32_wemos` / `esp32_wemos_debug` (classic ESP32 / Wemos), `esp32_t2can` / `esp32_t2can_debug` (LILYGO T-2Can, ESP32-S3), and `esp32_tembed` / `esp32_tembed_debug` (LILYGO T-Embed, ESP32-S3, CAN-only with display initialization).
 
 Web UI sources live in [`data/`](data/) — plain Preact + HTM with no build step; gzip the changed files and upload via `uploadfs` or the Update tab.
 

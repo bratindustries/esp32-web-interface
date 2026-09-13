@@ -34,7 +34,14 @@ env.Append(CPPDEFINES=[("WEB_REPO", env.StringifyMacro(repo))])
 # Named by chip architecture (matches the /settings `arch` field). The UI
 # aliases the older esp32_wemos / esp32_t2can names to these.
 pioenv = env["PIOENV"]
-target = "esp32s3" if "t2can" in pioenv else "esp32"
+if "tembed" in pioenv:
+    # The T-Embed image initializes board-specific hardware and must never be
+    # cross-selected with the otherwise-generic ESP32-S3/T-2Can image.
+    target = "esp32_tembed"
+elif "t2can" in pioenv:
+    target = "esp32s3"
+else:
+    target = "esp32"
 env.Append(CPPDEFINES=[("WEB_OTA_TARGET", env.StringifyMacro(target))])
 
 print("WEB_VERSION:", ver, "| WEB_REPO:", repo, "| WEB_OTA_TARGET:", target)

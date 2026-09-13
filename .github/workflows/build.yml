@@ -45,19 +45,22 @@ jobs:
       # Artifacts are copied out immediately after each build: a later pio
       # invocation can decide the environment is outdated and clean the
       # build dir, deleting the previous step's binaries.
-      - name: Build firmware (both targets)
+      - name: Build firmware (all targets)
         run: |
-          pio run -e esp32_wemos -e esp32_t2can
-          mkdir -p out/esp32_wemos out/esp32_t2can
+          pio run -e esp32_wemos -e esp32_t2can -e esp32_tembed
+          mkdir -p out/esp32_wemos out/esp32_t2can out/esp32_tembed
           cp .pio/build/esp32_wemos/bootloader.bin .pio/build/esp32_wemos/partitions.bin .pio/build/esp32_wemos/firmware.bin out/esp32_wemos/
           cp .pio/build/esp32_t2can/bootloader.bin .pio/build/esp32_t2can/partitions.bin .pio/build/esp32_t2can/firmware.bin out/esp32_t2can/
+          cp .pio/build/esp32_tembed/bootloader.bin .pio/build/esp32_tembed/partitions.bin .pio/build/esp32_tembed/firmware.bin out/esp32_tembed/
 
       - name: Build filesystems
         run: |
           pio run -e esp32_wemos -t buildfs
           pio run -e esp32_t2can -t buildfs
+          pio run -e esp32_tembed -t buildfs
           cp .pio/build/esp32_wemos/spiffs.bin out/esp32_wemos/
           cp .pio/build/esp32_t2can/spiffs.bin out/esp32_t2can/
+          cp .pio/build/esp32_tembed/spiffs.bin out/esp32_tembed/
 
       - name: List build outputs
         run: find out -name '*.bin' | sort
@@ -78,6 +81,12 @@ jobs:
             0xe000   "$BOOT_APP0" \
             0x10000  out/esp32_t2can/firmware.bin \
             0xc90000 out/esp32_t2can/spiffs.bin
+          python "$ESPTOOL" --chip esp32s3 merge_bin -o "esp32_tembed_${VER}-0x000.bin" \
+            0x0      out/esp32_tembed/bootloader.bin \
+            0x8000   out/esp32_tembed/partitions.bin \
+            0xe000   "$BOOT_APP0" \
+            0x10000  out/esp32_tembed/firmware.bin \
+            0xc90000 out/esp32_tembed/spiffs.bin
           ls -la esp32_*.bin esp32s3_*.bin
 
       # Combined OTA images for in-browser updates from the web interface:
@@ -92,6 +101,7 @@ jobs:
           targets = {
               'esp32_wemos': 'esp32_%s-ota.bin' % ver,
               'esp32_t2can': 'esp32s3_%s-ota.bin' % ver,
+              'esp32_tembed': 'esp32_tembed_%s-ota.bin' % ver,
           }
           for env, out in targets.items():
               fw = open('out/%s/firmware.bin' % env, 'rb').read()
@@ -118,6 +128,13 @@ jobs:
           path: esp32s3_${{ env.VER }}-ota.bin
           retention-days: 30
 
+      - name: Upload T-Embed OTA image
+        uses: actions/upload-artifact@v7
+        with:
+          name: esp32_tembed_${{ env.VER }}-ota
+          path: esp32_tembed_${{ env.VER }}-ota.bin
+          retention-days: 30
+
       - name: Upload esp32 image
         uses: actions/upload-artifact@v7
         with:
@@ -132,6 +149,13 @@ jobs:
           path: esp32s3_${{ env.VER }}-0x000.bin
           retention-days: 30
 
+      - name: Upload T-Embed image
+        uses: actions/upload-artifact@v7
+        with:
+          name: esp32_tembed_${{ env.VER }}-0x000
+          path: esp32_tembed_${{ env.VER }}-0x000.bin
+          retention-days: 30
+
       - name: Attach images to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
@@ -141,3 +165,5 @@ jobs:
             esp32s3_${{ env.VER }}-0x000.bin
             esp32_${{ env.VER }}-ota.bin
             esp32s3_${{ env.VER }}-ota.bin
+            esp32_tembed_${{ env.VER }}-0x000.bin
+            esp32_tembed_${{ env.VER }}-ota.bin

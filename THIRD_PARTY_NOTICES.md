@@ -1,9 +1,9 @@
 # Third-Party Notices
 
-The OpenInverter web interface bundles the following third-party components,
-served from the `data/` directory. Each is distributed under its own
-open-source license, identified below. The minified Preact and htm builds ship
-without an in-file license banner, so their attribution is recorded here.
+The OpenInverter web interface uses the following third-party components in
+its web assets or firmware. Each is distributed under its own open-source
+license, identified below. The minified Preact and htm builds ship without an
+in-file license banner, so their attribution is recorded here.
 
 ## Bundled components
 
@@ -16,6 +16,8 @@ without an in-file license banner, so their attribution is recorded here.
 | chartjs-plugin-annotation (`data/chartjs-annotation.min.js`) | 0.5.7 | MIT | © 2016 Evert Timberg | https://github.com/chartjs/chartjs-plugin-annotation |
 | NoSleep.js (`data/nosleep.js`) | 0.12.0 | MIT | © Rich Tibbett | https://github.com/richtr/NoSleep.js |
 | GridStack.js (`data/gridstack-all.js.gz`, `data/gridstack.min.css.gz`) | 12.6.0 | MIT | © 2019 Alain Dumesny | https://github.com/gridstack/gridstack.js |
+| TFT_eSPI (T-Embed firmware target) | 2.5.43 | MIT | © Bodmer and contributors | https://github.com/Bodmer/TFT_eSPI |
+| ArduinoJson (T-Embed firmware target) | 6.21.5 | MIT | © 2014-2023 Benoit Blanchon | https://github.com/bblanchon/ArduinoJson |
 
 NoSleep.js embeds two short, blank video clips (base64 `data:` URIs, generated
 with ffmpeg) used only to keep the screen awake on browsers without the Screen
@@ -27,7 +29,7 @@ Wake Lock API. They contain no third-party media.
 
 The following components are licensed under the MIT License, each under the
 copyright noted in the table above: **Preact, Preact Hooks, Chart.js,
-chartjs-plugin-annotation, and NoSleep.js**.
+chartjs-plugin-annotation, NoSleep.js, TFT_eSPI, and ArduinoJson**.
 
 ```
 MIT License
