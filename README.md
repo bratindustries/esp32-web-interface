@@ -1,6 +1,6 @@
 # esp32-web-interface
 
-**A modern web interface for [OpenInverter](https://openinverter.org) systems — over UART or CAN bus.**
+**A modern web interface for [OpenInverter](https://openinverter.org) systems — for the lilly-go T-embed over CAN bus.**
 
 [![Build combined images](https://github.com/wjcloudy/esp32-web-interface/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/wjcloudy/esp32-web-interface/actions/workflows/build.yml)
 [![Tests](https://github.com/wjcloudy/esp32-web-interface/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/wjcloudy/esp32-web-interface/actions/workflows/tests.yml)
