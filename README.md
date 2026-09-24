@@ -25,9 +25,13 @@ Works with the OpenInverter family of firmware:
 - Dashboard hero card: live state pill, error chips, battery voltage & temperature with sparklines
 - Installable to your phone's home screen (PWA manifest, iOS standalone)
 
-**Two inverter transports**
-- **UART** — the classic serial connection, with fast-mode streaming and pin-swap setting
-- **CAN bus** — full SDO support: device scanning, multi-node management with a boot-default node, parameter database download, live values, error log, and **firmware updates over CAN**
+**Real time dash board data on t-embed display**
+- dashboard data on main page
+- loads favorite params as widgets 
+- user adjustable params
+
+ **CAN bus** 
+ — full SDO support: device scanning, multi-node management with a boot-default node, parameter database download, live values, error log, and **firmware updates over CAN**
 
 **Telemetry**
 - **Gauges** — radial and line gauges in four sizes, per-gauge colours (hue-matched gradients), enum fields show their mode text, drag-to-reorder layout
@@ -70,7 +74,7 @@ esptool.py --chip esp32s3 write_flash 0x0 esp32_tembed_v4.1-0x000.bin  # origina
 - configure it to join your network (Settings → WiFi) and browse to http://inverter.local/ (mDNS).
 
 ### 4. Pick a transport
-In **Settings → Interface**: choose **UART** (default) or **CAN Bus** → Save → Scan for devices. The first node found becomes the boot default; mark any other node as default from the device list.
+The first node found becomes the boot default; mark any other node as default from the device list.
 
 ---
 
@@ -78,8 +82,6 @@ In **Settings → Interface**: choose **UART** (default) or **CAN Bus** → Save
 
 | Board | Notes |
 |---|---|
-| ESP32-WROOM-32E (and most dev boards) | UART to the inverter on pin 16 (RX ← inverter TX) and pin 17 (TX → inverter RX) |
-| LILYGO T-2Can (ESP32-S3) | Built-in CAN transceiver — default CAN pins RX 6 / TX 7 (`esp32_t2can` build target) |
 | LILYGO T-Embed (original ESP32-S3) | LCD + encoder; CAN defaults RX 16 / TX 17 (`esp32_tembed` build target); [firmware setup](doc/T_EMBED.md) |
 
 Optional peripherals (classic ESP32):
