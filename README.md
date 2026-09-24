@@ -25,13 +25,13 @@ Works with the OpenInverter family of firmware:
 - Dashboard hero card: live state pill, error chips, battery voltage & temperature with sparklines
 - Installable to your phone's home screen (PWA manifest, iOS standalone)
 
-**Real time dash board data on t-embed display**
+**t-embed display**
 - dashboard data on main page
 - loads favorite params as widgets 
 - user adjustable params
 
  **CAN bus** 
- — full SDO support: device scanning, multi-node management with a boot-default node, parameter database download, live values, error log, and **firmware updates over CAN**
+- full SDO support: device scanning, multi-node management with a boot-default node, parameter database download, live values, error log, and **firmware updates over CAN**
 
 **Telemetry**
 - **Gauges** — radial and line gauges in four sizes, per-gauge colours (hue-matched gradients), enum fields show their mode text, drag-to-reorder layout
