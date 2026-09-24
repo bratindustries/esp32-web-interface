@@ -9,6 +9,10 @@
 <img width="1325" height="813" alt="Dashboard" src="https://github.com/user-attachments/assets/c89a4b9f-ab54-4fa1-a785-3fb7d5112a4c" />
 <img width="1320" height="813" alt="Gauges" src="https://github.com/user-attachments/assets/d164b16f-ed82-48d3-8701-dd83529628c9" />
 
+**T-Embed CAN display**
+
+![T-Embed display showing SOC, power, pack voltage, current, and motor temperature](docs/images/t-embed-can-dashboard.jpg)
+
 Works with the OpenInverter family of firmware:
 [stm32-sine / FOC](https://github.com/jsphuebner/stm32-sine) ·
 [ZombieVerter VCU](https://github.com/damienmaguire/Stm32-vcu) ·
