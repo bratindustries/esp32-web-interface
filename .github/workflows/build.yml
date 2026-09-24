@@ -45,7 +45,7 @@ jobs:
       # Artifacts are copied out immediately after each build: a later pio
       # invocation can decide the environment is outdated and clean the
       # build dir, deleting the previous step's binaries.
-      - name: Build firmware (all targets)
+      - name: Build firmware
         run: |
           pio run -e esp32_wemos -e esp32_t2can -e esp32_tembed
           mkdir -p out/esp32_wemos out/esp32_t2can out/esp32_tembed
@@ -163,7 +163,7 @@ jobs:
           files: |
             esp32_${{ env.VER }}-0x000.bin
             esp32s3_${{ env.VER }}-0x000.bin
+            esp32_tembed_${{ env.VER }}-0x000.bin
             esp32_${{ env.VER }}-ota.bin
             esp32s3_${{ env.VER }}-ota.bin
-            esp32_tembed_${{ env.VER }}-0x000.bin
             esp32_tembed_${{ env.VER }}-ota.bin

@@ -53,8 +53,9 @@
 #include "driver/uart.h"
 #include "src/can_driver.h"
 #include "src/can_protocol.h"
-#include "src/t_embed_display.h"
-#include "src/t_embed_ui.h"
+#ifdef T_EMBED_DISPLAY
+#include "src/tembed_display.h"
+#endif
 
 #ifndef DBG_OUTPUT_PORT
 #define DBG_OUTPUT_PORT Serial2
@@ -95,11 +96,13 @@ bool txrxSwapped = true; // default: swapped for Wemos/OI/Zombie boards
 int uartRxPin = INVERTER_RX; // configurable UART pins (the swap toggle flips their roles)
 int uartTxPin = INVERTER_TX;
 bool apFallback = false; // true = AP broadcasts only while the station link is down
-#ifdef CAN_ONLY
-bool canMode = true; // dedicated CAN hardware cannot fall back to UART
+bool canMode =
+#ifdef T_EMBED_DISPLAY
+  true;
 #else
-bool canMode = false; // true = CAN bus mode, false = UART mode
+  false;
 #endif
+// true = CAN bus mode, false = UART mode
 int canNodeId = CAN_NODE_ID_MIN;
 int canSpeed = 2; // 0=125k, 1=250k, 2=500k
 int canRxPin = CAN_RX_PIN;
@@ -122,12 +125,6 @@ char uartMessBuff[UART_MESSBUF_SIZE];
   #define BOARD_ARCH "esp32c3"
 #else
   #define BOARD_ARCH "esp32"
-#endif
-
-#ifdef T_EMBED_DISPLAY
-  #define BOARD_ID "lilygo_t_embed"
-#else
-  #define BOARD_ID BOARD_ARCH
 #endif
 
 // Drive the optional CAN transceiver enable pins to their active level (call
@@ -160,6 +157,11 @@ struct VirtualVal {
 };
 static VirtualVal virtVals[VIRT_MAX];
 static int virtCount = 0;
+#ifdef T_EMBED_DISPLAY
+static TEmbedDisplay tEmbed;
+static bool displayConfigDirty = false;
+static uint32_t displayLastNodeRead = 0;
+#endif
 
 static void canVirtualRxHook(const twai_message_t* f) {
   for (int i = 0; i < virtCount; i++) {
@@ -662,6 +664,12 @@ void handleFileUpload(){
   } else if(upload.status == UPLOAD_FILE_END){
     if(fsUploadFile) {
       fsUploadFile.close();
+#ifdef T_EMBED_DISPLAY
+      if (upload.filename == "favorites.json" || upload.filename == "uiprefs.json" ||
+          upload.filename == "gauges.json" || upload.filename == "/favorites.json" ||
+          upload.filename == "/uiprefs.json" || upload.filename == "/gauges.json")
+        displayConfigDirty = true;
+#endif
       DBG_OUTPUT_PORT.println("Upload complete: " + upload.filename + " (" + String(upload.totalSize) + " bytes)");
     } else {
       DBG_OUTPUT_PORT.println("ERROR: Upload failed - file was not written (SPIFFS open failed)");
@@ -1290,62 +1298,6 @@ static String canGetParamUnit(const String& name) {
   if (unitEnd < 0) return "";
   return canParamJson.substring(unitPos, unitEnd);
 }
-
-#ifdef T_EMBED_DISPLAY
-// Native display backend.  Keeping this adapter in the sketch makes the UI
-// transport-agnostic and guarantees that the T-Embed performs every read,
-// write and action over CAN.
-static uint32_t tEmbedLastCanReply = 0;
-static bool tEmbedReadValue(const char* name, float* value) {
-  if (!name || !value || !canMode || canFwBusy() || !canDriverIsRunning()) return false;
-  if (canVirtualFind(String(name), value)) return !isnan(*value);
-  static uint32_t lastCacheAttempt = 0;
-  if (!canParamCacheLoaded) {
-    uint32_t now = millis();
-    if (lastCacheAttempt && now - lastCacheAttempt < 5000) return false;
-    lastCacheAttempt = now;
-    if (!canDownloadParamCache()) return false;
-  }
-  int id = canGetParamId(String(name));
-  if (id < 0) return false;
-  *value = canReadParamValue(id);
-  if (isnan(*value)) return false;
-  tEmbedLastCanReply = millis();
-  return true;
-}
-
-static bool tEmbedWriteValue(const char* name, float value) {
-  if (!name || !canMode || canFwBusy() || !canDriverIsRunning()) return false;
-  if (!canParamCacheLoaded && !canDownloadParamCache()) return false;
-  int id = canGetParamId(String(name));
-  if (id < 0) return false;
-  bool ok = canSdoWriteChecked(canParamIndex(id), canParamSubIndex(id), canEncodeValue(value)) == 0;
-  if (ok) tEmbedLastCanReply = millis();
-  return ok;
-}
-
-static bool tEmbedSendCan(uint32_t id, const uint8_t* data, uint8_t length) {
-  return canMode && !canFwBusy() && canDriverIsRunning() && length <= 8 &&
-         canDriverSend(id, data, length);
-}
-
-static String tEmbedFormatValue(const char* name, float value) {
-  if (!name || !canParamCacheLoaded) return "";
-  String unit = canGetParamUnit(String(name));
-  return unit.indexOf('=') >= 0 ? canLookupEnum(unit, (uint32_t)lroundf(value)) : "";
-}
-
-static String tEmbedUnitFor(const char* name) {
-  return name && canParamCacheLoaded ? canGetParamUnit(String(name)) : "";
-}
-
-static bool tEmbedCanOnline() {
-  return canMode && canDriverIsRunning() && !canFwBusy() &&
-         tEmbedLastCanReply && millis() - tEmbedLastCanReply < 2500;
-}
-
-static int tEmbedNodeId() { return canNodeId; }
-#endif
 
 // CAN command execution — parses OpenInverter text commands and translates to CAN SDO
 static String canExecuteCommand(const String& cmdStr, int repeat) {
@@ -2188,11 +2140,6 @@ static void loadSettings()
       if (canSpeed < 0 || canSpeed > 2) canSpeed = 2;
     }
   }
-#ifdef CAN_ONLY
-  // A stale settings file from another image must not switch a CAN-only board
-  // into UART mode or claim the T-Embed encoder pins for UART0.
-  canMode = true;
-#endif
 }
 
 static void handleSettings()
@@ -2222,11 +2169,13 @@ static void handleSettings()
     server.send(200, "text/json", "{\"result\":\"ok\"}");
   } else if (server.hasArg("can_mode")) {
     if (canFwBusy()) { server.send(409, "text/json", "{\"error\":\"CAN firmware update in progress\"}"); return; }
-#ifdef CAN_ONLY
-    canMode = true;
-#else
-    canMode = (server.arg("can_mode") == "1");
+#ifdef T_EMBED_DISPLAY
+    if (server.arg("can_mode") != "1") {
+      server.send(400, "text/json", "{\"error\":\"T-Embed display requires CAN mode\"}");
+      return;
+    }
 #endif
+    canMode = (server.arg("can_mode") == "1");
     if (server.hasArg("can_node_id")) canNodeId = server.arg("can_node_id").toInt();
     if (server.hasArg("can_speed")) canSpeed = server.arg("can_speed").toInt();
     if (server.hasArg("can_rx_pin")) canRxPin = server.arg("can_rx_pin").toInt();
@@ -2265,13 +2214,14 @@ static void handleSettings()
       canDriverInitForDevice(canNodeId, speed, canTxPin, canRxPin);
       canParamCacheLoaded = false;
       canParamJson = "";
-    }
-#ifndef CAN_ONLY
-    else {
+#ifdef T_EMBED_DISPLAY
+      displayLastNodeRead = 0;
+      tEmbed.loadConfig();
+#endif
+    } else {
       canDriverStop();
       initUART(true); // UART mode: apply any changed RX/TX pins
     }
-#endif
     server.send(200, "text/json", "{\"result\":\"ok\"}");
   } else {
     String json = "{\"dev_name\":\"" + jsonEscape(deviceName) + "\"";
@@ -2285,11 +2235,6 @@ static void handleSettings()
     json += apFallback ? "true" : "false";
     json += ",\"can_mode\":";
     json += canMode ? "true" : "false";
-#ifdef CAN_ONLY
-    json += ",\"can_only\":true";
-#else
-    json += ",\"can_only\":false";
-#endif
     json += ",\"can_node_id\":";
     json += canNodeId;
     json += ",\"can_speed\":";
@@ -2307,7 +2252,9 @@ static void handleSettings()
     json += ",\"can_en_inv\":";
     json += canEnInv ? "true" : "false";
     json += ",\"arch\":\"" BOARD_ARCH "\"";
-    json += ",\"board\":\"" BOARD_ID "\"";
+#ifdef T_EMBED_DISPLAY
+    json += ",\"t_embed_display\":true";
+#endif
     json += ",\"sse_port\":";
     json += SSE_PORT;
     // Return can_nodes from settings file if present
@@ -2501,21 +2448,19 @@ void setup(void){
   // Initialize SPIFFS early so we can load settings before UART init
   SPIFFS.begin();
   loadSettings();
+#ifdef T_EMBED_DISPLAY
+  canMode = true; // The default UART pins 1/3 collide with the encoder.
+  tEmbed.begin();
+#endif
   canVirtualLoad();
   canDriverSetRxHook(canVirtualRxHook);
-#ifndef CAN_ONLY
+#ifndef T_EMBED_DISPLAY
   initUART(); 
-#endif
-
-#ifdef T_EMBED_DISPLAY
-  TEmbedDisplay::begin();
-  // The ESP32-S3 variant defaults Wire to GPIO8/9; GPIO9 is the T-Embed LCD
-  // reset line. Use the board's actual QWIIC/I2C pins before probing the RTC.
-  Wire.begin(18, 8);
 #endif
   
 
   //check for external RTC and if present use to initialise on-chip RTC
+#ifndef T_EMBED_DISPLAY
   if (ext_rtc.begin())
   {
     haveRTC = true;
@@ -2532,6 +2477,7 @@ void setup(void){
   }
   else
     DBG_OUTPUT_PORT.println("No RTC found, defaulting to sequential file names"); 
+#endif
 
 #if ENABLE_SDCARD && !defined(S3_SKIP_SD_MMC)
   //initialise SD card in SDIO mode with timeout (SD_MMC.begin blocks without card)
@@ -2577,24 +2523,9 @@ void setup(void){
                              canRxPin, canTxPin);
     } else {
       DBG_OUTPUT_PORT.println("CAN bus init failed");
-#ifndef CAN_ONLY
       canMode = false;
-#endif
     }
   }
-
-#ifdef T_EMBED_DISPLAY
-  TEmbedUi::Backend displayBackend = {
-    tEmbedReadValue,
-    tEmbedWriteValue,
-    tEmbedSendCan,
-    tEmbedFormatValue,
-    tEmbedUnitFor,
-    tEmbedCanOnline,
-    tEmbedNodeId
-  };
-  TEmbedUi::begin(displayBackend);
-#endif
 
   //WIFI INIT
   #ifdef WIFI_IS_OFF_AT_BOOT
@@ -2867,6 +2798,10 @@ void setup(void){
       // Clear parameter cache so it reloads for the new device
       canParamCacheLoaded = false;
       canParamJson = "";
+#ifdef T_EMBED_DISPLAY
+      displayLastNodeRead = 0;
+      tEmbed.loadConfig();
+#endif
       // Switch to device-specific filter
       CanSpeed speed = (canSpeed == 0) ? CAN_125K : (canSpeed == 1) ? CAN_250K : CAN_500K;
       canDriverInitForDevice(canNodeId, speed, canTxPin, canRxPin);
@@ -2967,14 +2902,53 @@ void loop(void){
   server.handleClient();
   ArduinoOTA.handle();
 
-#ifdef T_EMBED_DISPLAY
-  TEmbedUi::loop();
-#endif
-
   // SSE value stream (gauges page). Never while binary logging owns the
   // UART at its own baud rate — though logging only runs with no WiFi
   // clients, so the two can't really coexist anyway.
   if (!fastLoggingActive) sseTick();
+
+#ifdef T_EMBED_DISPLAY
+  // The same synchronous loop owns HTTP, SDO reads and the LCD. Yield to web
+  // traffic; poll one value at a time and never touch CAN during an update.
+  if (displayConfigDirty) {
+    displayConfigDirty = false;
+    tEmbed.loadConfig();
+  }
+  static uint32_t displayPollAt = 0;
+  static int displayPollIndex = 0;
+  if (canMode && canDriverIsRunning() && !canFwBusy() && canParamCacheLoaded &&
+      millis() - displayPollAt >= 120 && tEmbed.count() > 0) {
+    displayPollAt = millis();
+    if (displayPollIndex >= tEmbed.count()) displayPollIndex = 0;
+    const int idx = displayPollIndex++;
+    const String& name = tEmbed.name(idx);
+    float value;
+    const bool virtualValue = canVirtualFind(name, &value);
+    if (!virtualValue) {
+      const int id = canGetParamId(name);
+      value = id >= 0 ? canReadParamValue(id) : NAN;
+    }
+    if (isnan(value)) tEmbed.invalidate(idx);
+    else {
+      if (!virtualValue) displayLastNodeRead = millis();
+      String unit = canGetParamUnit(name);
+      bool numeric = unit.indexOf('=') < 0;
+      String shown = numeric ? String(value, 1) : canLookupEnum(unit, (uint32_t)value);
+      if (!numeric) unit = "";
+      tEmbed.setValue(idx, shown, unit, value, numeric);
+    }
+  }
+  // The web dashboard normally triggers the parameter download on first load.
+  // A standalone dash must also work before any phone has connected.
+  static uint32_t cacheAttemptAt = 0;
+  if (canMode && canDriverIsRunning() && !canFwBusy() && !canParamCacheLoaded &&
+      millis() - cacheAttemptAt > 10000) {
+    cacheAttemptAt = millis();
+    canDownloadParamCache();
+  }
+  tEmbed.tick(canMode && canDriverIsRunning() && canParamCacheLoaded &&
+              displayLastNodeRead && millis() - displayLastNodeRead < 6000 && !canFwBusy(), canNodeId);
+#endif
 
   // AP-fallback mode transitions (drop the AP once the station is up, bring
   // it back if the station falls over) — checked every 15 s

@@ -11,13 +11,11 @@ All commands below are run from the project root (the directory containing `plat
 | `esp32_wemos_debug` | classic ESP32 | debug build with serial debug output |
 | `esp32_t2can` | LILYGO T-2Can (ESP32-S3) | 16MB flash, PSRAM, built-in CAN |
 | `esp32_t2can_debug` | LILYGO T-2Can (ESP32-S3) | debug build |
-| `esp32_tembed` | LILYGO T-Embed (ESP32-S3) | CAN-only (default RX 6 / TX 7); ST7789V dashboard and rotary gauge controls |
-| `esp32_tembed_debug` | LILYGO T-Embed (ESP32-S3) | debug build |
 
 Select an environment with `-e` / `--environment` (default is `esp32_wemos`), and a target with `-t` / `--target` (no target = build the firmware). List everything with `pio run --list-targets`.
 
 Two pre-scripts run automatically on every build, so there are **no manual steps** to remember:
-- `version.py` injects `WEB_VERSION` (from `git describe`), `WEB_REPO` (the repo's origin URL), and `WEB_OTA_TARGET` (the release image prefix, e.g. `esp32_tembed`).
+- `version.py` injects `WEB_VERSION` (from `git describe`), `WEB_REPO` (the repo's origin URL), and `WEB_OTA_TARGET` (the env name, e.g. `esp32_wemos`).
 - `gzip_assets.py` regenerates the `data/*.gz` files the device serves whenever a source changes — you never gzip by hand.
 
 # Building the firmware
@@ -25,7 +23,6 @@ Two pre-scripts run automatically on every build, so there are **no manual steps
 ```sh
 pio run -e esp32_wemos      # classic ESP32
 pio run -e esp32_t2can      # LILYGO T-2Can
-pio run -e esp32_tembed     # LILYGO T-Embed
 ```
 
 # Flashing the firmware
@@ -44,10 +41,6 @@ upload_port = 192.168.1.89
 [env:esp32_t2can]
 upload_protocol = espota
 upload_port = 192.168.1.92
-
-[env:esp32_tembed]
-upload_protocol = espota
-upload_port = 192.168.1.93
 ```
 
 # Flashing the web interface (filesystem)
@@ -80,7 +73,7 @@ esptool.py --chip esp32 merge_bin -o esp32_wemos-0x000.bin \
   0x290000 .pio/build/esp32_wemos/spiffs.bin
 ```
 
-The LILYGO T-2Can and T-Embed (ESP32-S3, 16MB) use a different bootloader offset (`0x0`) and SPIFFS offset (`0xc90000`) — see the `Merge combined images` step in the workflow for the exact offsets.
+The LILYGO T-2Can (ESP32-S3, 16MB) uses a different bootloader offset (`0x0`) and SPIFFS offset (`0xc90000`) — see the `Merge combined images` step in the workflow for the exact offsets.
 
 # Serial monitor
 
